@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>HTTP CORS Simulate</title>
+    <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/naive-ui@2.38.2/dist/index.js"></script>
+</head>
+<body>
+<div id="app">
+    <n-layout embedded>
+        <n-flex justify="center" vertical size="large">
+            <n-input-group >
+                <n-input-group-label :style="{width:'10%'} ">http://</n-input-group-label>
+                <n-input v-model:value="hostPort" :style="{ width: '30%' }" placeholder="host:port" @blur="loadApis"></n-input>
+                <n-select v-model:value="path" :style="{ width: '60%' }" :options="selectOptions"></n-select>
+            </n-input-group>
+            <n-button type="primary" @click="handleSimpleRequest"> 跨域请求1--简单请求 </n-button>
+            <n-button type="primary" @click="handlePreflightRequest"> 跨域请求2--复杂请求 </n-button>
+            <n-button type="primary" @click="handlePreflightRequestWithCookie"> 跨域请求3--复杂请求带Cookie </n-button>
+        </n-flex>
+    </n-layout>
+</div>
+<script>
+    const x = naive.createDiscreteApi(['notification'])
+    function notify(msg){
+        x.notification.info({
+            content: 'success',
+            meta: msg,
+            duration: 2500,
+            keepAliveOnHover: true
+        })
+    }
+    const app = Vue.createApp({
+        data() {
+            return {
+                hostPort: 'localhost:8001',
+                path:'',
+                selectOptions: [
+                    { label: '/simple_request/allowed', value: '/simple_request/allowed' },
+                    { label: '/simple_request/rejected', value: '/simple_request/rejected' },
+                    { label: '/comp_request/allowed', value: '/comp_request/allowed' },
+                ]
+            }
+        },
+        mounted(){
+            this.loadApis()
+        },
+        methods:{
+            checkUrlData(){
+                let url = "http://" + this.hostPort + this.path
+                console.log(url)
+                if (!url) {
+                    alert('请输入要访问的网址URL')
+                    return false
+                }
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    alert('must start with http')
+                    return false
+                }
+                return true
+            },
+            newXHR(){
+                let url = "http://" + this.hostPort + this.path
+                let xhr = new XMLHttpRequest()
+                xhr.open('GET',url,true)
+                xhr.onreadystatechange = function(){
+                    console.log(xhr.getAllResponseHeaders())
+                    if (xhr.readyState === 4 && xhr.status === 200){
+                        notify(xhr.responseText)
+                    }
+                }
+                xhr.onerror = function (){
+                    alert('请求失败：网络错误或跨域请求被阻止');
+                }
+                return xhr
+            },
+            loadApis(){
+                if (!this.hostPort){
+                    return
+                }
+                let this1 = this
+                let xhr = new XMLHttpRequest()
+                let url = "http://" + this.hostPort +"/apis"
+                xhr.open('GET',url,true)
+                xhr.onreadystatechange = function(){
+                    console.log(xhr.getAllResponseHeaders())
+                    if (xhr.readyState === 4 && xhr.status === 200){
+                        let data = JSON.parse(xhr.responseText)
+                        if (data.length === 0){
+                            return
+                        }
+                        this1.selectOptions=[]
+                        for (let item of data){
+                            this1.selectOptions.push({label:item,value:item})
+                        }
+                    }
+                }
+                xhr.onerror = function (){
+                    alert('请求失败：网络错误或跨域请求被阻止');
+                }
+                xhr.send()
+            },
+
+            handleSimpleRequest(){
+                if (!this.checkUrlData()){
+                    return
+                }
+                let xhr =this.newXHR()
+                xhr.send()
+            },
+            handlePreflightRequest(){
+                if (!this.checkUrlData()){
+                    return
+                }
+                let xhr = this.newXHR()
+                xhr.setRequestHeader('a','1')
+                xhr.send({
+                    "a":"1",
+                })
+            },
+            handlePreflightRequestWithCookie(){
+                if (!this.checkUrlData()){
+                    return
+                }
+                let xhr = this.newXHR()
+                xhr.withCredentials = true
+                xhr.setRequestHeader('a','1')
+                xhr.send({
+                    "a":"1",
+                })
+            }
+        }
+    })
+
+    app.use(naive)
+    app.mount('#app')
+
+</script>
+
+<style>
+    body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+    }
+    #app {
+        width: 50%;
+        min-width: 320px;
+    }
+</style>
+
+</body>
+</html>
